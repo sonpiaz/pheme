@@ -31,6 +31,12 @@ struct MainContentView: View {
                     session: session,
                     onStart: {
                         session.startRecording(modelContext: modelContext)
+                        // Auto-select the new meeting after a brief delay for SwiftData to flush
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            if let meeting = currentRecordingMeeting {
+                                selectedMeeting = meeting
+                            }
+                        }
                     },
                     onStop: {
                         session.stopRecording()
