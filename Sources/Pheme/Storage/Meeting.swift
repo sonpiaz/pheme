@@ -26,17 +26,37 @@ final class Meeting {
             .joined(separator: "\n")
     }
 
+    /// Conversation-style transcript with merged consecutive speaker turns.
+    /// Format: "Speaker A: text\nSpeaker B: text\n..."
     var formattedTranscript: String {
-        segments
-            .sorted { $0.timestamp < $1.timestamp }
-            .map {
-                let time = formatTimestamp($0.timestamp)
-                return "[\(time)] [\($0.speaker.rawValue)] \($0.text)"
+        let sorted = segments.sorted { $0.timestamp < $1.timestamp }
+        guard !sorted.isEmpty else { return "" }
+
+        var lines: [String] = []
+        var currentSpeaker = sorted[0].speaker
+        var currentTexts: [String] = []
+
+        for segment in sorted {
+            if segment.speaker == currentSpeaker {
+                currentTexts.append(segment.text)
+            } else {
+                lines.append("\(speakerLabel(currentSpeaker)): \(currentTexts.joined(separator: " "))")
+                currentSpeaker = segment.speaker
+                currentTexts = [segment.text]
             }
-            .joined(separator: "\n")
+        }
+        // Flush last speaker
+        if !currentTexts.isEmpty {
+            lines.append("\(speakerLabel(currentSpeaker)): \(currentTexts.joined(separator: " "))")
+        }
+
+        return lines.joined(separator: "\n")
     }
 
-    private func formatTimestamp(_ t: TimeInterval) -> String {
-        String(format: "%d:%02d", Int(t) / 60, Int(t) % 60)
+    private func speakerLabel(_ speaker: Speaker) -> String {
+        switch speaker {
+        case .me: return "Speaker A"
+        case .them: return "Speaker B"
+        }
     }
 }

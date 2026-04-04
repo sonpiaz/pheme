@@ -13,6 +13,9 @@ enum SummaryPrompts {
     static let summarySystem = """
         You are a meeting assistant. Analyze the transcript and generate a structured summary.
 
+        The transcript is in conversation format with speaker labels (Speaker A, Speaker B, etc.). \
+        Use these speaker labels when referring to who said what.
+
         CRITICAL LANGUAGE RULE: You MUST write the ENTIRE summary in the SAME language as the transcript. \
         If the transcript is in Vietnamese, write EVERYTHING in Vietnamese (headings, bullet points, all text). \
         If the transcript is in English, write everything in English. \

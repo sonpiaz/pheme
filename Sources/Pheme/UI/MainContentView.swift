@@ -215,26 +215,47 @@ struct MeetingDetailView: View {
 
     private var transcriptPanel: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 6) {
-                ForEach(meeting.segments.sorted(by: { $0.timestamp < $1.timestamp })) { segment in
-                    HStack(alignment: .top, spacing: 6) {
-                        Text(formatTimestamp(segment.timestamp))
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.tertiary)
-                            .frame(width: 36, alignment: .trailing)
-
-                        SpeakerPill(speaker: segment.speaker)
-
-                        Text(segment.text)
+            LazyVStack(alignment: .leading, spacing: 10) {
+                ForEach(mergedTranscriptTurns, id: \.id) { turn in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(turn.label)
+                            .font(.caption.bold())
+                            .foregroundStyle(turn.speaker == .me ? .blue : .orange)
+                        Text(turn.text)
                             .font(.callout)
                             .textSelection(.enabled)
+                            .foregroundStyle(.primary.opacity(0.9))
                     }
                 }
             }
             .padding(16)
         }
-        .frame(maxHeight: 200)
+        .frame(maxHeight: 250)
         .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    /// Merge consecutive segments from the same speaker into single turns
+    private var mergedTranscriptTurns: [TranscriptTurn] {
+        let sorted = meeting.segments.sorted { $0.timestamp < $1.timestamp }
+        guard !sorted.isEmpty else { return [] }
+
+        var turns: [TranscriptTurn] = []
+        var currentSpeaker = sorted[0].speaker
+        var currentTexts: [String] = []
+
+        for segment in sorted {
+            if segment.speaker == currentSpeaker {
+                currentTexts.append(segment.text)
+            } else {
+                turns.append(TranscriptTurn(speaker: currentSpeaker, texts: currentTexts))
+                currentSpeaker = segment.speaker
+                currentTexts = [segment.text]
+            }
+        }
+        if !currentTexts.isEmpty {
+            turns.append(TranscriptTurn(speaker: currentSpeaker, texts: currentTexts))
+        }
+        return turns
     }
 
     // MARK: - Helpers
@@ -257,7 +278,7 @@ struct MeetingDetailView: View {
     }
 
     private func copyTranscript() {
-        let transcript = meeting.rawTranscript
+        let transcript = meeting.formattedTranscript
         guard !transcript.isEmpty else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(transcript, forType: .string)
@@ -325,5 +346,24 @@ private struct LiveStreamView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Transcript Turn (merged consecutive segments)
+
+private struct TranscriptTurn: Identifiable {
+    let id = UUID()
+    let speaker: Speaker
+    let texts: [String]
+
+    var label: String {
+        switch speaker {
+        case .me: return "Speaker A"
+        case .them: return "Speaker B"
+        }
+    }
+
+    var text: String {
+        texts.joined(separator: " ")
     }
 }
