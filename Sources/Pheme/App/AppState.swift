@@ -14,6 +14,31 @@ final class AppState: ObservableObject {
 
     private init() {}
 
+    /// Purge stale empty meetings left over from crashed/test sessions.
+    /// Removes meetings with no segments, no summary, and default title.
+    func purgeEmptyMeetings(from context: ModelContext) {
+        // Note: SwiftData #Predicate doesn't support .isEmpty on relationships,
+        // so we fetch all non-recording meetings and filter in memory.
+        let descriptor = FetchDescriptor<Meeting>(
+            predicate: #Predicate<Meeting> { meeting in
+                !meeting.isRecording &&
+                (meeting.title == "New Meeting" || meeting.title == "")
+            }
+        )
+
+        guard let candidates = try? context.fetch(descriptor), !candidates.isEmpty else { return }
+
+        // Filter to only those with no segments (can't check in predicate)
+        let stale = candidates.filter { $0.segments.isEmpty && $0.summary == nil }
+        guard !stale.isEmpty else { return }
+
+        NSLog("[Pheme] Purging %d empty meeting(s)", stale.count)
+        for meeting in stale {
+            context.delete(meeting)
+        }
+        try? context.save()
+    }
+
     func refreshRecentMeetings(from context: ModelContext) {
         var descriptor = FetchDescriptor<Meeting>(
             predicate: #Predicate { !$0.isRecording },

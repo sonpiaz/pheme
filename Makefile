@@ -12,6 +12,9 @@ build: generate
 run: build
 	open build/Debug/Pheme.app
 
+release:
+	./scripts/release.sh
+
 clean:
 	rm -rf build DerivedData .build
 	rm -rf Pheme.xcodeproj

@@ -54,9 +54,6 @@ final class Meeting {
     }
 
     private func speakerLabel(_ speaker: Speaker) -> String {
-        switch speaker {
-        case .me: return "Speaker A"
-        case .them: return "Speaker B"
-        }
+        speaker.speakerLabel
     }
 }

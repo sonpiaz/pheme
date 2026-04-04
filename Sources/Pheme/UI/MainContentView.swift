@@ -48,6 +48,10 @@ struct MainContentView: View {
             }
         }
         .navigationTitle("Pheme")
+        .onAppear {
+            appState.purgeEmptyMeetings(from: modelContext)
+            appState.refreshRecentMeetings(from: modelContext)
+        }
         .onChange(of: session.isRecording) { _, isRecording in
             if isRecording, let meeting = currentRecordingMeeting {
                 selectedMeeting = meeting
@@ -220,7 +224,7 @@ struct MeetingDetailView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(turn.label)
                             .font(.caption.bold())
-                            .foregroundStyle(turn.speaker == .me ? .blue : .orange)
+                            .foregroundStyle(SpeakerPill.palette[turn.speaker.colorIndex % SpeakerPill.palette.count].fg)
                         Text(turn.text)
                             .font(.callout)
                             .textSelection(.enabled)
@@ -357,10 +361,7 @@ private struct TranscriptTurn: Identifiable {
     let texts: [String]
 
     var label: String {
-        switch speaker {
-        case .me: return "Speaker A"
-        case .them: return "Speaker B"
-        }
+        speaker.speakerLabel
     }
 
     var text: String {

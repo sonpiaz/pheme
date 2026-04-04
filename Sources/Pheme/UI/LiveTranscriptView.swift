@@ -82,7 +82,7 @@ private struct SegmentRow: View {
             }
         }
         .padding(.vertical, 2)
-        .background(segment.speaker == .me ? Color.blue.opacity(0.03) : Color.clear)
+        .background(SpeakerPill.palette[segment.speaker.colorIndex % SpeakerPill.palette.count].fg.opacity(0.03))
     }
 
     private func formatTimestamp(_ t: TimeInterval) -> String {
@@ -113,13 +113,32 @@ private struct LiveSegmentRow: View {
 struct SpeakerPill: View {
     let speaker: Speaker
 
+    /// Color palette for N speakers
+    static let palette: [(bg: Color, fg: Color)] = [
+        (.blue.opacity(0.15), .blue),       // 0: Me
+        (.orange.opacity(0.12), .orange),   // 1: Them
+        (.green.opacity(0.12), .green),     // 2
+        (.purple.opacity(0.12), .purple),   // 3
+        (.pink.opacity(0.12), .pink),       // 4
+        (.cyan.opacity(0.12), .cyan),       // 5
+        (.mint.opacity(0.12), .mint),       // 6
+        (.indigo.opacity(0.12), .indigo),   // 7
+        (.teal.opacity(0.12), .teal),       // 8
+        (.brown.opacity(0.12), .brown),     // 9
+    ]
+
+    private var colors: (bg: Color, fg: Color) {
+        let idx = speaker.colorIndex % Self.palette.count
+        return Self.palette[idx]
+    }
+
     var body: some View {
         Text(speaker.rawValue)
             .font(.caption2.bold())
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(speaker == .me ? Color.blue.opacity(0.15) : Color.orange.opacity(0.12))
-            .foregroundStyle(speaker == .me ? .blue : .orange)
+            .background(colors.bg)
+            .foregroundStyle(colors.fg)
             .clipShape(Capsule())
     }
 }
