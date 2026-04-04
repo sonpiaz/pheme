@@ -26,6 +26,9 @@ final class RealtimeTranscriber {
     private let maxBufferSize = 50
     private let bufferLock = NSLock()
 
+    /// When true, audio sending is paused to respect rate limits
+    private var isThrottled = false
+
     /// Called with partial transcript text (delta)
     var onTranscriptDelta: ((String) -> Void)?
 
@@ -94,8 +97,8 @@ final class RealtimeTranscriber {
     // MARK: - Send Audio
 
     func sendAudio(base64Chunk: String) {
-        // Buffer audio during reconnection
-        if state != .connected {
+        // Buffer audio during reconnection or rate limit backoff
+        if state != .connected || isThrottled {
             bufferLock.lock()
             audioBuffer.append(base64Chunk)
             if audioBuffer.count > maxBufferSize {
@@ -244,9 +247,19 @@ final class RealtimeTranscriber {
         case "error":
             if let errorObj = json["error"] as? [String: Any],
                let message = errorObj["message"] as? String {
-                Self.debugLog("ERROR: \(message)")
+                let errorType = errorObj["type"] as? String ?? "unknown"
+                Self.debugLog("ERROR: \(errorType) — \(message)")
+
                 // "buffer too small" is benign — don't surface to UI
                 guard !message.contains("buffer too small") else { break }
+
+                // Rate limited — back off, don't surface as fatal error
+                if errorType == "rate_limit_error" {
+                    Self.debugLog("Rate limited, backing off audio send for 5s")
+                    rateLimitBackoff()
+                    break
+                }
+
                 DispatchQueue.main.async {
                     self.onError?(TranscriberError.apiError(message))
                 }
@@ -292,6 +305,22 @@ final class RealtimeTranscriber {
             } else {
                 try? data.write(to: logFile)
             }
+        }
+    }
+
+    // MARK: - Rate Limit Backoff
+
+    /// Temporarily pause audio sending when rate limited, then resume.
+    private func rateLimitBackoff() {
+        guard !isThrottled else { return }
+        isThrottled = true
+        NSLog("[Pheme] Rate limit backoff: pausing audio send for 5s")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+            guard let self else { return }
+            self.isThrottled = false
+            NSLog("[Pheme] Rate limit backoff ended, resuming audio send")
+            self.replayBuffer()
         }
     }
 

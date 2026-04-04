@@ -35,6 +35,8 @@ actor SummaryGenerator {
 
     // MARK: - Chat Completions
 
+    private let maxRetries = 3
+
     private func chatCompletion(systemPrompt: String, userContent: String, maxTokens: Int) async throws -> String {
         let body: [String: Any] = [
             "model": "gpt-4o",
@@ -52,26 +54,43 @@ actor SummaryGenerator {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        var lastError: Error = SummaryError.invalidResponse
 
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SummaryError.invalidResponse
+        for attempt in 0..<maxRetries {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw SummaryError.invalidResponse
+            }
+
+            // Rate limited — wait and retry with exponential backoff
+            if httpResponse.statusCode == 429 {
+                let retryAfter = httpResponse.value(forHTTPHeaderField: "Retry-After")
+                    .flatMap(Double.init) ?? pow(2.0, Double(attempt + 1))
+                let delay = min(retryAfter, 60.0)
+                NSLog("[Pheme] Rate limited, retrying in %.0fs (attempt %d/%d)", delay, attempt + 1, maxRetries)
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                lastError = SummaryError.apiError(429, "Rate limited")
+                continue
+            }
+
+            guard httpResponse.statusCode == 200 else {
+                let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
+                throw SummaryError.apiError(httpResponse.statusCode, errorBody)
+            }
+
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let choices = json["choices"] as? [[String: Any]],
+                  let first = choices.first,
+                  let message = first["message"] as? [String: Any],
+                  let content = message["content"] as? String else {
+                throw SummaryError.parseError
+            }
+
+            return content
         }
 
-        guard httpResponse.statusCode == 200 else {
-            let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw SummaryError.apiError(httpResponse.statusCode, errorBody)
-        }
-
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let choices = json["choices"] as? [[String: Any]],
-              let first = choices.first,
-              let message = first["message"] as? [String: Any],
-              let content = message["content"] as? String else {
-            throw SummaryError.parseError
-        }
-
-        return content
+        throw lastError
     }
 }
 
