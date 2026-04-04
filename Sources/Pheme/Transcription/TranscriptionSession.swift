@@ -192,10 +192,20 @@ final class TranscriptionSession: ObservableObject {
         mixer.systemChunker.onChunkReady = nil
 
         // Finalize meeting
-        if let meeting, let startDate = recordingStartDate {
+        if let meeting, let modelContext, let startDate = recordingStartDate {
             meeting.isRecording = false
             meeting.duration = Date().timeIntervalSince(startDate)
-            try? modelContext?.save()
+
+            // Auto-delete empty meetings (no segments captured)
+            if meeting.segments.isEmpty {
+                modelContext.delete(meeting)
+                try? modelContext.save()
+                self.meeting = nil
+                NSLog("[Pheme] Empty meeting deleted")
+                return
+            }
+
+            try? modelContext.save()
         }
 
         NSLog("[Pheme] Recording finalized")

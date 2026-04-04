@@ -1,7 +1,7 @@
 import Foundation
 
 /// Generates meeting title and structured summary via OpenAI Chat Completions.
-/// Model: gpt-4o-mini, Temperature: 0.3
+/// Model: gpt-4o, Temperature: 0.3
 actor SummaryGenerator {
     private let apiKey: String
     private let endpoint = URL(string: "https://api.openai.com/v1/chat/completions")!
@@ -37,7 +37,7 @@ actor SummaryGenerator {
 
     private func chatCompletion(systemPrompt: String, userContent: String, maxTokens: Int) async throws -> String {
         let body: [String: Any] = [
-            "model": "gpt-4o-mini",
+            "model": "gpt-4o",
             "temperature": 0.3,
             "max_tokens": maxTokens,
             "messages": [
