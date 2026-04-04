@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Granola-style bottom bar: minimal, elegant recording controls.
+/// Bottom bar: minimal, elegant recording controls.
 struct RecordingControlView: View {
     @ObservedObject var session: TranscriptionSession
     let onStart: () -> Void
